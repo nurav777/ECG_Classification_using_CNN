@@ -1,0 +1,45 @@
+services:
+  edge-service:
+    build: ./backend/edge_service
+    container_name: edge-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/edge_service/model:/app/model
+
+  fog-service:
+    build: ./backend/fog_service
+    container_name: fog-service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./backend/fog_service/model:/app/model
+
+  cloud-service:
+    build: ./backend/cloud_service
+    container_name: cloud-service
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./backend/cloud_service/model:/app/model
+
+  gateway:
+    build: ./backend/gateway
+    container_name: gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - edge-service
+      - fog-service
+      - cloud-service
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_GATEWAY_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/ws/stream
+    depends_on:
+      - gateway

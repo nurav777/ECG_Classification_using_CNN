@@ -1,0 +1,243 @@
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #e6eef8;
+  background: #0d1421;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.4rem;
+}
+
+.status {
+  margin: 0 0 16px 0;
+  color: #9bb3cc;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+select,
+input {
+  border: 1px solid #29405b;
+  background: #111c2d;
+  color: #dbe7f5;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.chart,
+.metrics {
+  background: #111c2d;
+  border: 1px solid #24364d;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.metrics {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.layer-hero {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 2px solid var(--layer-accent, #334155);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.layer-hero__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.layer-hero__name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f8fafc;
+}
+
+.layer-hero__hint {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  max-width: 52rem;
+}
+
+.layer-pill--edge {
+  --layer-accent: #34d399;
+}
+.layer-pill--fog {
+  --layer-accent: #fbbf24;
+}
+.layer-pill--cloud {
+  --layer-accent: #a78bfa;
+}
+.layer-pill--unknown {
+  --layer-accent: #94a3b8;
+}
+
+.layer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.layer-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.swatch--edge {
+  background: #34d399;
+}
+.swatch--fog {
+  background: #fbbf24;
+}
+.swatch--cloud {
+  background: #a78bfa;
+}
+
+.layer-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: 1px solid var(--layer-accent, #475569);
+  color: #f8fafc;
+  background: color-mix(in srgb, var(--layer-accent, #64748b) 22%, #0f172a);
+}
+
+.layer-pill--sm {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.metric-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid #24364d;
+}
+
+.metric-card__k {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.metric-card__v {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.metric-card__v--prediction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.metric-card__sub {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.tag--ok {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+}
+.tag--risk {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.cascade-hops {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #24364d;
+  background: #0f172a;
+}
+
+.cascade-hops__title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.cascade-hops__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cascade-hop {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cascade-arrow {
+  color: #64748b;
+  font-size: 0.9rem;
+}

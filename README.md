@@ -1,214 +1,159 @@
-# ECG Classification Models - Performance Comparison
+# Edge-Fog-Cloud ECG Classification Simulator
 
----
+This project simulates an intelligent multi-layer deployment for ECG signal classification:
 
-## Overview
+- **Edge layer** (`ecg_3k_params.tflite`) for fast inference
+- **Fog layer** (`ecg_46k_params.tflite`) for balanced latency/accuracy
+- **Cloud layer** (`ecg_7m_params.tflite`) for highest accuracy
 
-This repository contains three ECG classification models with varying complexity, all trained on MIT-BIH Arrhythmia Dataset. Models range from ultra-lightweight (3K parameters) to heavyweight (7M parameters) for different deployment scenarios.
+The frontend streams ECG-like values in real-time and shows routing decisions, prediction confidence, latency, and selected layer.
 
----
+## Architecture
 
-## Dataset
+`Frontend -> Gateway -> Decision Engine -> Edge/Fog/Cloud Services`
 
-**Source**: MIT-BIH Arrhythmia Database (Kaggle CSV)
+- **Frontend**: React + Vite + Recharts + WebSocket
+- **Gateway**: FastAPI API gateway + decision logic + ECG stream endpoint
+- **Model services**: 3 independent FastAPI services using `tensorflow.lite.Interpreter`
+- **Containerization**: Docker Compose
 
-- **Input**: 187 ECG time-series samples per record
-- **Task**: Binary classification - Normal (0) vs Abnormal (1-4)
-- **Original Distribution**: 82.8% normal, 17.2% abnormal
-- **Training Samples**: 144,942 (after SMOTE balancing)
+## Project Structure
 
----
-
-## Model Comparison
-
-| Model         | Parameters | Model Size | Test Accuracy | Test Loss | Key Features                                      |
-| ------------- | ---------- | ---------- | ------------- | --------- | ------------------------------------------------- |
-| **3K Model**  | 3,969      | 15.5 KB    | **97.07%**    | 0.0942    | SMOTE, GlobalAveragePooling1D, BatchNormalization |
-| **46K Model** | 46,785     | 182.75 KB  | **97.56%**    | 0.1098    | 2 Conv1D layers, Class weights, Dropout           |
-| **7M Model**  | 7,157,633  | 27.30 MB   | **98.85%**    | 0.1131    | Deep ResNet, Multi-scale, SE attention, SMOTE     |
-
----
-
-## Model Details
-
-### 🚀 **3K Parameters Model** (`ecg_3k_params.ipynb`)
-
-**Best for**: Edge devices, microcontrollers, real-time monitoring
-
-**Architecture**:
-
-- Input: (187, 1) ECG signals
-- Conv1D(16) → BatchNorm → MaxPool1D
-- Conv1D(32) → BatchNorm → MaxPool1D
-- GlobalAveragePooling1D
-- Dense(32) → Dropout(0.3) → Dense(1)
-
-**Performance**:
-
-- Normal class: 97% precision, 99% recall
-- Anomaly class: 95% precision, 88% recall
-- F1-score: 0.97
-
-**Deployment**:
-
-- TFLite float16: 16.0 KB (98.90% accuracy)
-- Inference: <5ms on Cortex-M4
-- Power: <0.1 mJ per inference
-
----
-
-### ⚖️ **46K Parameters Model** (`ecg_46k_params.ipynb`)
-
-**Best for**: Mobile applications, moderate resource devices
-
-**Architecture**:
-
-- Input: (187, 1) ECG signals
-- Conv1D(16, kernel_size=5) → MaxPool1D
-- Conv1D(32, kernel_size=5) → MaxPool1D
-- Flatten → Dense(32) → Dropout(0.3) → Dense(1)
-
-**Performance**:
-
-- Normal class: 98% precision, 99% recall
-- Anomaly class: 95% precision, 90% recall
-- F1-score: 0.98
-
-**Features**:
-
-- Class weights for imbalance handling
-- Kaggle-compatible data loading
-- TFLite export ready
-
----
-
-### 🏋️ **7M Parameters Model** (`ecg_7M_params.ipynb`)
-
-**Best for**: High-performance servers, research, maximum accuracy
-
-**Architecture**:
-
-- Multi-scale feature extraction (3,5,7 kernel sizes)
-- Residual blocks with Squeeze-and-Excitation attention
-- Deep ResNet architecture (64→128→256→512 channels)
-- GlobalAveragePooling + GlobalMaxPooling
-- Dense(512→256→128) → Dense(1)
-
-**Performance**:
-
-- Normal class: 99% precision, 99% recall
-- Anomaly class: 94% precision, 96% recall
-- F1-score: 0.98
-
-**Features**:
-
-- Advanced training techniques (learning rate scheduling)
-- SMOTE data balancing
-- State-of-the-art architecture
-
----
-
-## Key Insights
-
-### 📊 **Performance vs Complexity**
-
-- **3K → 46K**: +0.49% accuracy for 12x parameter increase
-- **46K → 7M**: +1.29% accuracy for 153x parameter increase
-- **Diminishing returns** beyond 46K parameters
-
-### 💡 **Recommendations**
-
-- **Edge/Mobile**: Use 3K model - best efficiency-to-performance ratio
-- **Web/Desktop**: Use 46K model - balanced approach
-- **Research/Cloud**: Use 7M model - maximum accuracy
-
-### 🎯 **Deployment Scenarios**
-
-| Scenario         | Recommended Model | Reason                                |
-| ---------------- | ----------------- | ------------------------------------- |
-| Wearable devices | 3K Model          | Ultra-low power, <16KB                |
-| Mobile apps      | 46K Model         | Good accuracy, reasonable size        |
-| Hospital systems | 7M Model          | Maximum accuracy, unlimited resources |
-| IoT sensors      | 3K Model          | Real-time processing                  |
-
----
-
-## Files Structure
-
-```
-├── ecg_3k_params.ipynb      # Ultra-lightweight model with SMOTE
-├── ecg_46k_params.ipynb     # Mid-range model with class weights
-├── ecg_7M_params.ipynb      # Heavy ResNet model
-├── README.md                 # This file
-└── output/                  # Generated model files
-    ├── ecg_model_3k_params.h5
-    ├── ecg_model_46k_params.h5
-    ├── ecg_model_7M_params.h5
-    └── *.tflite           # TensorFlow Lite exports
+```text
+root/
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── Dockerfile
+│   └── package.json
+├── backend/
+│   ├── gateway/
+│   │   ├── app.py
+│   │   ├── decision_engine.py
+│   │   ├── ecg_stream.py
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   ├── edge_service/
+│   │   ├── app.py
+│   │   ├── model/ecg_3k_params.tflite
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   ├── fog_service/
+│   │   ├── app.py
+│   │   ├── model/ecg_46k_params.tflite
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   └── cloud_service/
+│       ├── app.py
+│       ├── model/ecg_7m_params.tflite
+│       ├── requirements.txt
+│       └── Dockerfile
+├── docker-compose.yml
+└── README.md
 ```
 
----
+## Routing Modes
 
-## Usage
+Gateway `/predict` supports:
 
-### Running Models
+1. **Manual strategy**  
+   Route directly to selected layer (`edge`, `fog`, `cloud`).
 
-1. **Kaggle**: Upload any notebook and run directly
-2. **Local**: Install dependencies and run cells sequentially
-3. **Data**: Automatically downloads from Kaggle dataset
+2. **Rule-based strategy**  
+   - `low_latency` -> `edge`
+   - `high_accuracy` -> `cloud`
+   - otherwise -> `fog`
 
-### Model Export
+3. **Cascade strategy**  
+   `edge -> fog -> cloud`, escalating only when confidence is below threshold.
 
-Each notebook exports:
+## TFLite Inference Flow (Implemented in all model services)
 
-- **H5 format**: Full Keras model with weights
-- **TFLite float32**: Baseline TensorFlow Lite model
-- **TFLite float16**: Optimized for edge deployment
+Each service uses TensorFlow Lite exactly as required:
 
-### Inference Example
+1. `interpreter = tf.lite.Interpreter(model_path=...)`
+2. `interpreter.allocate_tensors()`
+3. `input_details = interpreter.get_input_details()`
+4. `output_details = interpreter.get_output_details()`
+5. `interpreter.set_tensor(...)`
+6. `interpreter.invoke()`
+7. `output = interpreter.get_tensor(...)`
 
-```python
-import tensorflow as tf
+Services automatically reshape/resize incoming ECG windows to expected tensor shapes and return:
 
-# Load TFLite model
-interpreter = tf.lite.Interpreter(model_path="ecg_model_3k_params_float16.tflite")
-interpreter.allocate_tensors()
+- `prediction`
+- `confidence`
+- `latency_ms`
+- `layer`
 
-# Predict ECG sample
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+## Latency Simulation
 
-interpreter.set_tensor(input_details[0]['index'], ecg_sample)
-interpreter.invoke()
-prediction = interpreter.get_tensor(output_details[0]['index'])
+- **Edge**: 5-10 ms
+- **Fog**: 20-50 ms
+- **Cloud**: 100-300 ms
+
+These are added inside each service with `time.sleep()` to demonstrate practical routing tradeoffs.
+
+## Setup
+
+### 1) Put model files in service model folders
+
+Copy your `.tflite` models to:
+
+- `backend/edge_service/model/ecg_3k_params.tflite`
+- `backend/fog_service/model/ecg_46k_params.tflite`
+- `backend/cloud_service/model/ecg_7m_params.tflite`
+
+### 2) Run with Docker Compose
+
+```bash
+docker-compose up --build
 ```
 
----
+### 3) Open app
 
-## Performance Metrics Summary
+- Frontend: `http://localhost:5173`
+- Gateway API docs: `http://localhost:8000/docs`
+- Edge service docs: `http://localhost:8001/docs`
+- Fog service docs: `http://localhost:8002/docs`
+- Cloud service docs: `http://localhost:8003/docs`
 
-| Metric             | 3K Model | 46K Model | 7M Model  |
-| ------------------ | -------- | --------- | --------- |
-| **Accuracy**       | 97.07%   | 97.56%    | 98.85%    |
-| **Precision**      | 0.96     | 0.97      | 0.97      |
-| **Recall**         | 0.94     | 0.95      | 0.98      |
-| **F1-Score**       | 0.95     | 0.96      | 0.98      |
-| **Model Size**     | 15.5 KB  | 182.75 KB | 27.30 MB  |
-| **Parameters**     | 3,969    | 46,785    | 7,157,633 |
-| **Inference Time** | <5ms     | ~15ms     | ~100ms    |
+## API Contract
 
----
+### `POST /predict` (Gateway)
 
-## Conclusion
+Request example:
 
-This project demonstrates trade-offs between model complexity and performance in ECG classification:
+```json
+{
+  "signal": [0.1, 0.2, -0.1],
+  "mode": "auto",
+  "strategy": "rule_based",
+  "preference": "balanced",
+  "confidence_threshold": 0.8
+}
+```
 
-- **3K model** achieves 97% accuracy with minimal resources - ideal for edge deployment
-- **46K model** provides balanced performance for mobile applications
-- **7M model** reaches 99% accuracy for research/clinical use
+Response fields:
 
-The **3K parameter model** offers the best efficiency-to-performance ratio, making it ideal for real-world edge deployment in wearable ECG monitoring devices.
+- `selected_layer`
+- `prediction`
+- `confidence`
+- `latency_ms`
+- `strategy`
+- `hops` (full service path; useful for cascade visualization)
 
----
+### `GET /ws/stream` (Gateway WebSocket)
 
-_All models are production-ready with TFLite export for deployment across platforms._
+Streams ECG-like values every ~200 ms:
+
+- latest `sample`
+- rolling `window` for charting
+- `timestamp`
+
+## Notes
+
+- This is a deployment and routing simulator to showcase **latency vs accuracy** behavior.
+- For production, add authentication, retries/circuit breaking, structured logging, and observability.
