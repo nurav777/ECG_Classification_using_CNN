@@ -1,6 +1,8 @@
 services:
   edge-service:
-    build: ./backend/edge_service
+    build:
+      context: ./backend
+      dockerfile: edge_service/Dockerfile
     container_name: edge-service
     ports:
       - "8001:8001"
@@ -8,7 +10,9 @@ services:
       - ./backend/edge_service/model:/app/model
 
   fog-service:
-    build: ./backend/fog_service
+    build:
+      context: ./backend
+      dockerfile: fog_service/Dockerfile
     container_name: fog-service
     ports:
       - "8002:8002"
@@ -16,7 +20,9 @@ services:
       - ./backend/fog_service/model:/app/model
 
   cloud-service:
-    build: ./backend/cloud_service
+    build:
+      context: ./backend
+      dockerfile: cloud_service/Dockerfile
     container_name: cloud-service
     ports:
       - "8003:8003"

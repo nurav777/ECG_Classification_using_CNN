@@ -13,6 +13,7 @@ class RoutingContext:
     strategy: RoutingStrategy
     preference: Literal["low_latency", "balanced", "high_accuracy"] = "balanced"
     confidence_threshold: float = 0.8
+    max_latency_ms: float | None = None
 
 
 def compute_routing_complexity(signal: list[float]) -> float:
@@ -27,20 +28,37 @@ def compute_routing_complexity(signal: list[float]) -> float:
 
 
 class DecisionEngine:
-    # Balanced rule-based: map complexity to layer (tuned for the synthetic stream).
-    _BAL_EDGE_BELOW = 0.035
-    _BAL_FOG_BELOW = 0.12
+    """Routes rule-based traffic. When ``max_latency_ms`` is set, it encodes latency vs accuracy preference (not EMA)."""
+
+    _BAL_EDGE_BELOW = 0.17
+    _BAL_FOG_BELOW = 0.2
+
+    # Target latency budget (ms) → tier. Higher = user tolerates more delay → stronger model.
+    # Examples: ~400 → fog, ~1000 → cloud, low values → edge.
+    _TARGET_EDGE_MAX_MS = 350.0
+    _TARGET_FOG_MAX_MS = 800.0
+
+    @classmethod
+    def layer_from_target_latency_ms(cls, required_ms: float) -> LayerName:
+        """Map a user-specified latency budget to edge / fog / cloud."""
+        if required_ms <= cls._TARGET_EDGE_MAX_MS:
+            return "edge"
+        if required_ms <= cls._TARGET_FOG_MAX_MS:
+            return "fog"
+        return "cloud"
 
     def choose_initial_layer(self, ctx: RoutingContext, signal: list[float] | None = None) -> LayerName:
         if ctx.strategy == "manual" and ctx.mode in {"edge", "fog", "cloud"}:
             return ctx.mode
+
+        if ctx.strategy == "rule_based" and ctx.max_latency_ms is not None:
+            return self.layer_from_target_latency_ms(float(ctx.max_latency_ms))
 
         if ctx.strategy == "rule_based":
             if ctx.preference == "low_latency":
                 return "edge"
             if ctx.preference == "high_accuracy":
                 return "cloud"
-            # Balanced: route by window “complexity” so edge / fog / cloud all appear in demos.
             if signal:
                 c = compute_routing_complexity(signal)
                 if c < self._BAL_EDGE_BELOW:
@@ -50,7 +68,6 @@ class DecisionEngine:
                 return "cloud"
             return "fog"
 
-        # For cascade and default auto behavior, start from edge.
         return "edge"
 
     @staticmethod

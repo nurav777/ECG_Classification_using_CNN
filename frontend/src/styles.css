@@ -26,9 +26,28 @@ h1 {
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.control-span-2 {
+  grid-column: span 2;
+}
+
+.control-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+@media (max-width: 720px) {
+  .control-span-2 {
+    grid-column: span 1;
+  }
 }
 
 label {
@@ -36,6 +55,14 @@ label {
   flex-direction: column;
   gap: 6px;
   font-size: 0.9rem;
+}
+
+.field-hint {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #8aa0b8;
+  font-weight: 400;
+  max-width: 36rem;
 }
 
 select,
@@ -60,6 +87,10 @@ input {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 8px;
+}
+
+.metrics--wide {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
 .layer-hero {
@@ -92,6 +123,13 @@ input {
   line-height: 1.45;
   color: #cbd5e1;
   max-width: 52rem;
+}
+
+.layer-hero__escalation {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fde68a;
 }
 
 .layer-pill--edge {

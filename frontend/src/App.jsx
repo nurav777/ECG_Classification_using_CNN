@@ -16,18 +16,36 @@ function App() {
   const [strategy, setStrategy] = useState("rule_based");
   const [preference, setPreference] = useState("balanced");
   const [threshold, setThreshold] = useState(0.8);
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
+  const [simulationMode, setSimulationMode] = useState("noisy");
+  const [simulationIntensity, setSimulationIntensity] = useState(0.5);
+  const [maxLatencyMs, setMaxLatencyMs] = useState("");
   const [samples, setSamples] = useState([]);
   const [result, setResult] = useState(null);
   const [status, setStatus] = useState("connecting...");
   const lastPredictRef = useRef(0);
+  /** Bumps whenever stream /predict controls change so late responses are ignored. */
+  const predictGenRef = useRef(0);
+  /** Increments on every /predict so only the latest in-flight response may update the UI (same effect, multiple POSTs). */
+  const fetchSeqRef = useRef(0);
 
   useEffect(() => {
+    predictGenRef.current += 1;
+    const requestGeneration = predictGenRef.current;
+    fetchSeqRef.current = 0;
+    setResult(null);
+    lastPredictRef.current = 0;
+
+    const abortController = new AbortController();
     const socket = new WebSocket(WS_BASE);
     socket.onopen = () => setStatus("streaming");
     socket.onclose = () => setStatus("disconnected");
     socket.onerror = () => setStatus("error");
     socket.onmessage = async (event) => {
       const data = JSON.parse(event.data);
+      if (predictGenRef.current !== requestGeneration) {
+        return;
+      }
       setSamples(data.window || []);
 
       const now = Date.now();
@@ -41,37 +59,89 @@ function App() {
       }
 
       lastPredictRef.current = now;
+      const fetchId = ++fetchSeqRef.current;
       try {
+        const maxLat = maxLatencyMs === "" ? null : Number(maxLatencyMs);
         const response = await fetch(`${API_BASE}/predict`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abortController.signal,
           body: JSON.stringify({
             signal: windowSignal,
             mode,
             strategy,
             preference,
-            confidence_threshold: Number(threshold)
+            confidence_threshold: Number(threshold),
+            simulation_enabled: simulationEnabled,
+            simulation_mode: simulationMode,
+            simulation_intensity: Number(simulationIntensity),
+            max_latency_ms: Number.isFinite(maxLat) ? maxLat : null
           })
         });
         if (!response.ok) {
           throw new Error(`Request failed: ${response.status}`);
         }
         const payload = await response.json();
+        if (predictGenRef.current !== requestGeneration) {
+          return;
+        }
+        if (fetchId !== fetchSeqRef.current) {
+          return;
+        }
+        const expectedSim = simulationEnabled ? simulationMode : "none";
+        if (payload.simulation_mode !== expectedSim) {
+          return;
+        }
         setResult(payload);
       } catch (error) {
+        if (error.name === "AbortError") {
+          return;
+        }
+        if (predictGenRef.current !== requestGeneration) {
+          return;
+        }
         setStatus(`predict error: ${error.message}`);
       }
     };
 
-    return () => socket.close();
-  }, [mode, strategy, preference, threshold]);
+    return () => {
+      abortController.abort();
+      socket.close();
+    };
+  }, [mode, strategy, preference, threshold, simulationEnabled, simulationMode, simulationIntensity, maxLatencyMs]);
+
+  // Always use the same length as /predict (187): full `samples` is ~256 points, but
+  // `predicted_input` is 187 — mixing them made the chart rescale and look "broken"
+  // when a prediction arrived after changing simulation mode.
+  const chartSeries = useMemo(() => {
+    if (simulationEnabled && result?.predicted_input?.length) {
+      return result.predicted_input;
+    }
+    if (samples.length >= DEFAULT_WINDOW) {
+      return samples.slice(-DEFAULT_WINDOW);
+    }
+    return samples;
+  }, [samples, result?.predicted_input, simulationEnabled]);
 
   const chartData = useMemo(
-    () => samples.map((value, idx) => ({ i: idx, value })),
-    [samples]
+    () => chartSeries.map((value, idx) => ({ i: idx, value })),
+    [chartSeries]
   );
 
-  const selectedLayer = result?.selected_layer;
+  const chartRemountKey =
+    simulationEnabled && result?.predicted_input?.length
+      ? `model-${result.simulation_mode}-${result.prediction}-${result.confidence}`
+      : "stream-window";
+
+  // Simulated inputs are min–maxed to [0, 1] on the gateway (MIT-BIH scale); keep Y fixed so Recharts stays stable.
+  const yDomain = useMemo(() => {
+    if (simulationEnabled && result?.predicted_input?.length) {
+      return [0, 1];
+    }
+    return [-1.2, 1.2];
+  }, [simulationEnabled, result?.predicted_input]);
+
+  const selectedLayer = result?.layer ?? result?.selected_layer;
   const layerVisual = selectedLayer
     ? LAYER_THEME[selectedLayer] ?? { label: String(selectedLayer), pillClass: "layer-pill--unknown" }
     : null;
@@ -132,15 +202,73 @@ function App() {
             disabled={strategy !== "cascade"}
           />
         </label>
+
+        <label className="control-span-2">
+          <span className="control-inline">
+            <input
+              type="checkbox"
+              checked={simulationEnabled}
+              onChange={(e) => setSimulationEnabled(e.target.checked)}
+            />
+            Input simulation (affects signal only)
+          </span>
+          <select
+            value={simulationMode}
+            onChange={(e) => setSimulationMode(e.target.value)}
+            disabled={!simulationEnabled}
+          >
+            <option value="normal">Normal (clean copy)</option>
+            <option value="noisy">Noisy</option>
+            <option value="abnormal">Abnormal (spikes / bursts)</option>
+            <option value="drift">Baseline drift</option>
+          </select>
+        </label>
+
+        <label>
+          Simulation intensity
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            value={simulationIntensity}
+            onChange={(e) => setSimulationIntensity(e.target.value)}
+            disabled={!simulationEnabled}
+          />
+        </label>
+
+        <label>
+          Target latency budget (ms) → layer
+          <input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="e.g. 400 = fog, 1000 = cloud"
+            value={maxLatencyMs}
+            onChange={(e) => setMaxLatencyMs(e.target.value)}
+            disabled={strategy !== "rule_based"}
+          />
+          <span className="field-hint">
+            Lower = favor speed (≤350 → edge). Mid (~400) → fog. High (~1000+) → cloud. Leave empty to use preference /
+            signal complexity instead.
+          </span>
+        </label>
       </section>
 
       <section className="chart">
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chartData}>
+          <LineChart key={chartRemountKey} data={chartData}>
             <XAxis dataKey="i" hide />
-            <YAxis domain={[-1.2, 1.2]} />
+            <YAxis domain={yDomain} allowDataOverflow={false} width={48} />
             <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#00c2ff" dot={false} strokeWidth={2} />
+            <Line
+              type="linear"
+              dataKey="value"
+              stroke="#00c2ff"
+              dot={false}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </section>
@@ -155,6 +283,7 @@ function App() {
               mid → fog, high → cloud.
             </div>
           )}
+          {result.escalated ? <div className="layer-hero__escalation">Cascade escalated beyond the first layer.</div> : null}
         </div>
       )}
 
@@ -170,7 +299,7 @@ function App() {
         </span>
       </section>
 
-      <section className="metrics">
+      <section className="metrics metrics--wide">
         <div className="metric-card">
           <div className="metric-card__k">Selected layer</div>
           <div className="metric-card__v">
@@ -199,8 +328,28 @@ function App() {
           <div className="metric-card__v">{result ? Number(result.confidence).toFixed(4) : "—"}</div>
         </div>
         <div className="metric-card">
-          <div className="metric-card__k">Latency (end-to-end)</div>
-          <div className="metric-card__v">{result ? `${result.latency_ms} ms` : "—"}</div>
+          <div className="metric-card__k">Model latency (Σ hops)</div>
+          <div className="metric-card__v">{result?.model_latency_ms != null ? `${result.model_latency_ms} ms` : "—"}</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-card__k">Simulated delay (Σ hops)</div>
+          <div className="metric-card__v">
+            {result?.simulated_latency_ms != null ? `${result.simulated_latency_ms} ms` : "—"}
+          </div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-card__k">Service total (Σ hops)</div>
+          <div className="metric-card__v">{result?.total_latency_ms != null ? `${result.total_latency_ms} ms` : "—"}</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-card__k">Gateway wall time</div>
+          <div className="metric-card__v">
+            {result?.request_latency_ms != null ? `${result.request_latency_ms} ms` : "—"}
+          </div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-card__k">Input simulation</div>
+          <div className="metric-card__v">{result?.simulation_mode ?? "—"}</div>
         </div>
       </section>
 
